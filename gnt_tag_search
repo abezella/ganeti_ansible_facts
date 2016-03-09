@@ -45,28 +45,14 @@ class GntRapi:
 		else:
 			raise Exception("HTTP status error: %s." % resp.status)
 		
-def gnt_tag_info(rapi_data,name,info_type):
+
+def gnt_tag_find(rapi_data,tag,info_type):
 	rapi=GntRapi(rapi_data["host"],rapi_data["port"],rapi_data["user"],
 		rapi_data["pass"])
 
-	tags_raw=rapi.query(["tags"],["=","name",name], # fields, filter
-		qtype=info_type)["data"][0][0][1] # inst or net)[... parsing ...]
-
-	tags_attrib={}
-	tags_simple=[]
-	for i in tags_raw:
-		k,s,v=i.partition(":")
-		if s != ":":
-			tags_simple+=[k]
-		elif k in tags_attrib:
-			if tags_attrib[k] is list:
-				tags_attrib[k]+=[v]
-			else:
-				tags_attrib[k]=[tags_attrib[k],v]
-		else:
-			tags_attrib[k]=v
-	
-	return {"raw":tags_raw,"attrib":tags_attrib,"simple":tags_simple}
+	tags_raw=map(lambda x: {x[0][1]:x[1][1]}, rapi.query(["name","tags"],None,
+		qtype=info_type)["data"])
+	return tags_raw
 
 def main():
 	module=AnsibleModule(
@@ -76,7 +62,7 @@ def main():
 		check_invalid_arguments=True,
 		supports_check_mode=False)
 	try:
-		tag_info=gnt_tag_info(module.params['rapi'],module.params['name'],
+		tag_info=gnt_tag_find(module.params['rapi'],module.params['name'],
 			module.params["type"])
 	except HTTPException as e:
 		module.fail_json(msg="HTTP error: %s " % e)
@@ -86,7 +72,7 @@ def main():
 		module.fail_json(msg="Error: %s " % e)
 	else:
 		module.exit_json(msg="Host fetched",changed=False,
-			ansible_facts={"ganeti_tags":tag_info})
+			result=tag_info)
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':
