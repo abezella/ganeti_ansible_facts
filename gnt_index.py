@@ -23,8 +23,8 @@ def gnt_inst_list(rapi):
       tags.add_fact("os",i[2][1])
       tags.add_fact("status",i[3][1])
       tags.add_to_group_map(group_map,instance_name)
-      meta_list[instance_name]={"ganeti":tags.dump()}
-  group_map["_meta"]=meta_list
+      meta_list[instance_name]=tags.dump()
+  group_map["_meta"]={"hostvars":meta_list}
   return group_map
 
 def gnt_inst_get(rapi,name):
@@ -36,7 +36,7 @@ def gnt_inst_get(rapi,name):
     return False
   tags.add_fact("os",vars_raw[1][1])
   tags.add_fact("status",vars_raw[2][1])
-  return {"ganeti":tags.dump()}
+  return tags.dump()
 
 
 def err(msg,rc=1):
@@ -48,8 +48,9 @@ def main():
   """Main procedure"""
   # read configuration
   try:
-    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-      'rapi.yml'),'r') as stream:
+    conf_filename=os.getenv('GNT_RAPI_CONF', os.path.join(os.path.dirname(
+        os.path.realpath(__file__)),'rapi.yml'))
+    with open(conf_filename,'r') as stream:
         conf_data=yaml.load(stream)
   except yaml.YAMLError as e:
     err("Configuration file syntax error: %s " % e)

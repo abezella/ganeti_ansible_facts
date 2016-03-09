@@ -5,7 +5,7 @@ import ssl
 import base64
 import json
 
-from gnt_rapi import GntRapi
+from gnt_rapi import GntRapi, GntTagMap
 
 def gnt_tag_info(rapi_data,name,info_type):
 	rapi=GntRapi(rapi_data["host"],rapi_data["port"],rapi_data["user"],
@@ -14,21 +14,8 @@ def gnt_tag_info(rapi_data,name,info_type):
 	tags_raw=rapi.query(["tags"],["=","name",name], # fields, filter
 		qtype=info_type)["data"][0][0][1] # inst or net)[... parsing ...]
 
-	tags_attrib={}
-	tags_simple=[]
-	for i in tags_raw:
-		k,s,v=i.partition(":")
-		if s != ":":
-			tags_simple+=[k]
-		elif k in tags_attrib:
-			if tags_attrib[k] is list:
-				tags_attrib[k]+=[v]
-			else:
-				tags_attrib[k]=[tags_attrib[k],v]
-		else:
-			tags_attrib[k]=v
-	
-	return {"raw":tags_raw,"attrib":tags_attrib,"simple":tags_simple}
+	tagmap=GntTagMap(tags_raw)
+	return tagmap.dump()["ganeti_tags"]
 
 def main():
 	module=AnsibleModule(

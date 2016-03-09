@@ -91,11 +91,12 @@ class GntTagMap:
     """dumps tags and hostvars"""
     if self.nolist:
       return False
-    ret=dict(self.additional)
-    ret["tags"]=dict()
-    ret["tags"]["attrib"]=self.attrib
-    ret["tags"]["simple"]=self.simple
-    ret["tags"]["raw"]=self.raw
+    ret=dict()
+    ret["ganeti_info"]=self.additional
+    ret["ganeti_tags"]=dict()
+    ret["ganeti_tags"]["attrib"]=self.attrib
+    ret["ganeti_tags"]["simple"]=self.simple
+    ret["ganeti_tags"]["raw"]=self.raw
     return ret
 
 # vim:ff=unix ts=2 sw=2 ai expandtab
