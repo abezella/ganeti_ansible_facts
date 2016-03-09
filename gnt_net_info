@@ -1,0 +1,67 @@
+#!/usr/bin/python
+from httplib import HTTPSConnection, HTTPException
+import socket
+import ssl
+import base64
+import json
+
+class GntRapi:
+	def __init__(self,host,port,ru,rp):
+		self.hc=HTTPSConnection(host,port, timeout=20,
+			context=ssl._create_unverified_context())
+		authstr=base64.encodestring('%s:%s'%(ru,rp)).replace('\n', '')
+		self.authhead={"Authorization": "Basic %s"%authstr}
+
+	def get(self,path):
+		self.hc.request('GET',path,headers=self.authhead) 
+		resp=self.hc.getresponse()
+		if resp.status==200:
+			return json.load(resp)
+		elif resp.status==404:
+			raise Exception("instance not found.")
+		elif resp.status==401:
+			raise Exception("login failed.")
+		else:
+			raise Exception("HTTP status error: %s." % resp.status)
+		
+
+def gnt_net_info(rapi_data,instance):
+    rapi=GntRapi(rapi_data["host"],rapi_data["port"],rapi_data["user"],
+        rapi_data["pass"])
+    inst_data=rapi.get("/2/instances/"+instance) #FIXME
+
+    i=0
+    ret=[]
+    for net,ip,mac in zip(inst_data["nic.networks"],inst_data["nic.ips"],
+            inst_data["nic.macs"]):
+        if net:
+            info=rapi.get("/2/networks/"+net)
+            ret+=[{"if":i,"nw_uuid":net,"mac":mac,"ipv4":ip,
+                    "gw":info["gateway"], "nw":info["network"],
+                    "gw6":info["gateway6"],"nw6":info["network6"]}]
+        else:
+            ret+=[{"if":i,"mac":mac}]
+        i=i+1
+    return ret
+
+def main():
+	module=AnsibleModule(
+		argument_spec={"rapi":{"required":True,"type":'dict'},
+			"instance":{"required":True,"type":'str'}},
+		check_invalid_arguments=True,
+		supports_check_mode=False)
+	try:
+		net_info=gnt_net_info(module.params['rapi'], module.params['instance'])
+	except HTTPException as e:
+		module.fail_json(msg="HTTP error: %s " % e)
+	except socket.error as e:
+		module.fail_json(msg="HTTP Socket error: %s" %e)
+	except Exception as e:
+		module.fail_json(msg="Error: %s " % e)
+	else:
+		module.exit_json(msg="Host fetched",changed=False,
+			ansible_facts={"ganeti_net":net_info})
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+	main()
