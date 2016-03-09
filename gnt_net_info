@@ -5,25 +5,7 @@ import ssl
 import base64
 import json
 
-class GntRapi:
-	def __init__(self,host,port,ru,rp):
-		self.hc=HTTPSConnection(host,port, timeout=20,
-			context=ssl._create_unverified_context())
-		authstr=base64.encodestring('%s:%s'%(ru,rp)).replace('\n', '')
-		self.authhead={"Authorization": "Basic %s"%authstr}
-
-	def get(self,path):
-		self.hc.request('GET',path,headers=self.authhead) 
-		resp=self.hc.getresponse()
-		if resp.status==200:
-			return json.load(resp)
-		elif resp.status==404:
-			raise Exception("instance not found.")
-		elif resp.status==401:
-			raise Exception("login failed.")
-		else:
-			raise Exception("HTTP status error: %s." % resp.status)
-		
+from gnt_rapi import GntRapi
 
 def gnt_net_info(rapi_data,instance):
     rapi=GntRapi(rapi_data["host"],rapi_data["port"],rapi_data["user"],
