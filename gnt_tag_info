@@ -1,0 +1,97 @@
+#!/usr/bin/python
+from httplib import HTTPSConnection, HTTPException
+import socket
+import ssl
+import base64
+import json
+
+class GntRapi:
+	def __init__(self,host,port,ru,rp):
+		self.hc=HTTPSConnection(host,port, timeout=20,
+			context=ssl._create_unverified_context())
+		authstr=base64.encodestring('%s:%s'%(ru,rp)).replace('\n', '')
+		self.authhead={"Authorization": "Basic %s"%authstr}
+
+	def get(self,path):
+		self.hc.request('GET',path,headers=self.authhead) 
+		resp=self.hc.getresponse()
+		if resp.status==200:
+			return json.load(resp)
+		elif resp.status==404:
+			raise Exception("instance not found.")
+		elif resp.status==401:
+			raise Exception("login failed.")
+		else:
+			raise Exception("HTTP status error: %s." % resp.status)
+
+	def _merge_dicts(self,x,y):
+		z=x.copy()
+		z.update(y)
+		return z
+
+	def query(self,qfields,qfilter,qtype="instance"):
+		self.hc.request('PUT',"/2/query/"+qtype,
+			body=json.dumps({"fields":qfields,"filter":qfilter,
+				"qfilter":qfilter}),
+			headers=self._merge_dicts(self.authhead,
+				{"Content-type":"application/json"})) 
+		resp=self.hc.getresponse()
+		if resp.status==200:
+			return json.load(resp)
+		elif resp.status==500:
+			raise Exception(qtype+" not found.")
+		elif resp.status==401:
+			raise Exception("login failed.")
+		else:
+			raise Exception("HTTP status error: %s." % resp.status)
+		
+
+def gnt_tag_find(rapi_data,tag):
+	pass;
+
+def gnt_tag_info(rapi_data,name,info_type):
+	rapi=GntRapi(rapi_data["host"],rapi_data["port"],rapi_data["user"],
+		rapi_data["pass"])
+
+	tags_raw=rapi.query(["tags"],["=","name",name], # fields, filter
+		qtype=info_type)["data"][0][0][1] # inst or net)[... parsing ...]
+
+	tags_attrib={}
+	tags_simple=[]
+	for i in tags_raw:
+		k,s,v=i.partition(":")
+		if s != ":":
+			tags_simple+=[k]
+		elif k in tags_attrib:
+			if tags_attrib[k] is list:
+				tags_attrib[k]+=[v]
+			else:
+				tags_attrib[k]=[tags_attrib[k],v]
+		else:
+			tags_attrib[k]=v
+	
+	return {"raw":tags_raw,"attrib":tags_attrib,"simple":tags_simple}
+
+def main():
+	module=AnsibleModule(
+		argument_spec={"rapi":{"required":True,"type":'dict'},
+			"name":{"required":True,"type":'str'},
+			"type":{"default":"instance","choices":["instance","network"]}},
+		check_invalid_arguments=True,
+		supports_check_mode=False)
+	try:
+		tag_info=gnt_tag_info(module.params['rapi'],module.params['name'],
+			module.params["type"])
+	except HTTPException as e:
+		module.fail_json(msg="HTTP error: %s " % e)
+	except socket.error as e:
+		module.fail_json(msg="HTTP Socket error: %s" %e)
+	except Exception as e:
+		module.fail_json(msg="Error: %s " % e)
+	else:
+		module.exit_json(msg="Host fetched",changed=False,
+			ansible_facts={"ganeti_tags":tag_info})
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+	main()
