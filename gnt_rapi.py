@@ -82,6 +82,11 @@ class GntTagMap:
         if g not in group_map: # if group not listed before create key
           group_map[g]=[]
         group_map[g]+=[instance_name]
+    # default group to include hosts without group
+    if "all" not in group_map:
+      group_map["all"]=[]
+    group_map["all"]+=[instance_name]
+
 
   def add_fact(self,key,value):
     """adds hostvar to dump"""
